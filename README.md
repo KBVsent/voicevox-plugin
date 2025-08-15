@@ -5,7 +5,7 @@
 ### 基本功能
 - `#vv 文本` 使用默认或个人偏好 speaker 合成
 - `#vv <speaker名称或ID> 文本` 指定 speaker 合成（临时覆盖个人偏好）
-- `#vv setkey <apiKey>` 设置 API Key（仅主人）
+- `#vv setkey <apiKey>` 设置 API Key（仅主人）（目前apiKey并没有限制，因此config已配置默认key）
 
 ### 个人偏好设置（持久化到 Redis）
 - `#vv set speaker <名称或ID>` 设置个人偏好说话人（支持中文别名）
