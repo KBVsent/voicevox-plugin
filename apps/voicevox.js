@@ -79,6 +79,13 @@ export class VoiceVoxTTS extends plugin {
       let raw = e.msg.trim()
       if (!raw.startsWith(prefix)) return false
 
+      // 排除帮助命令，由专门的help.js处理
+      const escapedPrefix = (prefix || '#vv').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      if (new RegExp(`^${escapedPrefix}\\s*帮助$`, 'i').test(raw) || 
+          new RegExp(`^${escapedPrefix}\\s+帮助$`, 'i').test(raw)) {
+        return false  // 不处理，让help.js接管
+      }
+
       // 子命令：设置 key
       if (/^#vv\s+setkey\s+/i.test(raw)) {
         if (!e.isMaster) return e.reply('无权限')
@@ -89,25 +96,7 @@ export class VoiceVoxTTS extends plugin {
         return e.reply('VoiceVox ApiKey 已更新')
       }
 
-      // 子命令：帮助菜单 #vv帮助
-      // 使用配置的前缀生成示例，兼容自定义前缀
-      const escapedPrefix = (prefix || '#vv').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      if (new RegExp(`^${escapedPrefix}\\s*帮助`, 'i').test(raw)) {
-        let msg = `${prefix} 帮助 — 可用指令列表：\n\n`
-        msg += `• ${prefix} 文本\n    使用默认说话人合成语音。示例：${prefix} こんにちは\n\n`
-        msg += `• ${prefix} <说话人名称或ID> 文本\n    使用指定说话人。示例：${prefix} 3 こんにちは\n\n`
-        msg += `• ${prefix} setkey <apiKey>\n    （仅主人/管理员）设置 VoiceVox API Key\n\n`
-        msg += `• ${prefix} set speaker <名称或ID>\n    设置个人偏好说话人\n\n`
-        msg += `• ${prefix} set pitch <value>\n    设置音调（pitch）\n\n`
-        msg += `• ${prefix} set speed <value>\n    设置语速（speed）\n\n`
-        msg += `• ${prefix} set intonation <value>\n    设置语调缩放（intonation）\n\n`
-        msg += `• ${prefix} get\n    查看当前个人偏好设置\n\n`
-        msg += `• ${prefix} reset\n    重置个人偏好为默认配置\n\n`
-        msg += `• ${prefix} list [筛选词]\n    查看可用的说话人列表，可用筛选词或ID进行查找。示例：${prefix} list 毛豆\n\n`
-        msg += '提示：说话人名称支持部分匹配，可使用 #vv list 查找完整名称。'
 
-        return e.reply(msg)
-      }
 
       // 子命令：设置个人偏好
       if (/^#vv\s+set\s+/i.test(raw)) {
