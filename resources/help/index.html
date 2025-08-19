@@ -1,109 +1,44 @@
-<!DOCTYPE html>
-<html lang="zh-cn">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VoiceVox 帮助</title>
-  <link rel="stylesheet" href="{{_res_path}}help/index.css" />
-</head>
-<body>
-  <div class="container">
-    <div class="head-box">
-      <div class="title">VoiceVox</div>
-      <div class="label">语音合成助手</div>
-    </div>
-    
-    <div class="cont-box">
-      <div class="help-group">🎤 语音合成功能</div>
-      <div class="help-table">
-        <div class="tr">
-          <div class="td">
-            <div class="help-icon">🔊</div>
-            <strong class="help-title">{{prefix}}tts 文本</strong>
-            <span class="help-desc">基础语音合成，使用当前默认说话人和参数</span>
-          </div>
-          <div class="td">
-            <div class="help-icon">👤</div>
-            <strong class="help-title">{{prefix}}tts 说话人 文本</strong>
-            <span class="help-desc">指定说话人进行语音合成，如：{{prefix}}tts 1 你好</span>
-          </div>
-        </div>
-        
-        <div class="tr">
-          <div class="td">
-            <div class="help-icon">🎭</div>
-            <strong class="help-title">{{prefix}}设置说话人 ID</strong>
-            <span class="help-desc">设置默认说话人，如：{{prefix}}设置说话人 1</span>
-          </div>
-          <div class="td">
-            <div class="help-icon">🎵</div>
-            <strong class="help-title">{{prefix}}设置音调 值</strong>
-            <span class="help-desc">设置音调高低（-0.15~0.15），如：{{prefix}}设置音调 0.1</span>
-          </div>
-        </div>
-        
-        <div class="tr">
-          <div class="td">
-            <div class="help-icon">⚡</div>
-            <strong class="help-title">{{prefix}}设置语速 值</strong>
-            <span class="help-desc">设置语音速度（0.5~2.0），如：{{prefix}}设置语速 1.2</span>
-          </div>
-          <div class="td">
-            <div class="help-icon">🎼</div>
-            <strong class="help-title">{{prefix}}设置语调 值</strong>
-            <span class="help-desc">设置语调强弱（0.0~2.0），如：{{prefix}}设置语调 1.5</span>
-          </div>
-        </div>
-        
-        <div class="tr">
-          <div class="td">
-            <div class="help-icon">📋</div>
-            <strong class="help-title">{{prefix}}查看设置</strong>
-            <span class="help-desc">查看当前的语音合成参数配置</span>
-          </div>
-          <div class="td">
-            <div class="help-icon">📝</div>
-            <strong class="help-title">{{prefix}}说话人列表</strong>
-            <span class="help-desc">查看所有可用的说话人列表</span>
-          </div>
-        </div>
-        
-        <div class="tr">
-          <div class="td">
-            <div class="help-icon">🔄</div>
-            <strong class="help-title">{{prefix}}重置设置</strong>
-            <span class="help-desc">重置所有语音参数为默认值</span>
-          </div>
-          <div class="td">
-            <div class="help-icon">❓</div>
-            <strong class="help-title">{{prefix}}vv帮助</strong>
-            <span class="help-desc">查看本帮助页面</span>
-          </div>
-        </div>
-        
-        {{if isMaster}}
-        <div class="tr">
-          <div class="td">
-            <div class="help-icon">🔑</div>
-            <strong class="help-title">{{prefix}}vv设置API密钥 key</strong>
-            <span class="help-desc">设置VoiceVox API密钥（仅主人可用）</span>
-          </div>
-          <div class="td"></div>
-        </div>
-        {{/if}}
+{{extend defaultLayout}}
+
+{{block 'css'}}
+<link rel="stylesheet" type="text/css" href="{{_res_path}}/help/index.css"/>
+<% style = style.replace(/{{_res_path}}/g, _res_path) %>
+{{@style}}
+{{/block}}
+
+{{block 'main'}}
+
+<div class="info-box">
+  <div class="head-box type{{bgType}}">
+    <div class="title">{{helpCfg.title||"使用帮助"}}</div>
+    <div class="label">{{helpCfg.subTitle || "Yunzai-Bot & VoiceVox-Plugin"}}</div>
+  </div>
+</div>
+
+{{each helpGroup group}}
+{{set len = group?.list?.length || 0 }}
+<div class="cont-box">
+  <div class="help-group">{{group.group}}</div>
+  {{if len > 0}}
+  <div class="help-table">
+    <div class="tr">
+      {{each group.list help idx}}
+      <div class="td">
+        <span class="help-icon" style="{{help.css}}"></span>
+        <strong class="help-title">{{help.title}}</strong>
+        <span class="help-desc">{{help.desc}}</span>
       </div>
+      {{if idx%colCount === colCount-1 && idx>0 && idx< len-1}}
     </div>
-    
-    <div class="tips-box">
-      <div class="tips-title">💡 使用提示</div>
-      <div class="tips-content">
-        <p>• 首次使用前请设置API密钥（如需要）和偏好的说话人</p>
-        <p>• 支持的音调范围：-0.15 到 0.15，负值降低音调，正值提高音调</p>
-        <p>• 支持的语速范围：0.5 到 2.0，值越大语速越快</p>
-        <p>• 支持的语调范围：0.0 到 2.0，值越大语调变化越明显</p>
-        <p>• 如遇到问题，可尝试重置设置或检查网络连接</p>
-      </div>
+    <div class="tr">
+      {{/if}}
+      {{/each}}
+      <% for(let i=(len-1)%colCount; i< colCount-1 ; i++){ %>
+      <div class="td"></div>
+      <% } %>
     </div>
   </div>
-</body>
-</html>
+  {{/if}}
+</div>
+{{/each}}
+{{/block}}
