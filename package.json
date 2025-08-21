@@ -1,0 +1,29 @@
+{
+  "name": "voicevox-plugin",
+  "version": "1.0.0",
+  "description": "VoiceVox TTS plugin for Yunzai-Bot",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint --fix"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KBVsent/voicevox-plugin.git"
+  },
+  "keywords": [
+    "Miao-Yunzai",
+    "TRSS-Yunzai",
+    "VoiceVox",
+    "TTS",
+    "Chinese",
+    "Japanese",
+    "Katakana"
+  ],
+  "author": "KBVsent",
+  "license": "MIT",
+  "imports": {
+    "#model": "./model/index.js",
+    "#config": "./config/index.js"
+  }
+}

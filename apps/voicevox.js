@@ -10,6 +10,8 @@ import { containsChinese, convertChineseToKatakana } from '../model/chineseConve
  * 指令：
  *  - #vv 文本
  *  - #vv <speaker名称或ID> 文本
+ *  - #cvv 中文文本 （手动触发中文转片假名）
+ *  - #cvv <speaker名称或ID> 中文文本
  *  - #vv setkey <apiKey>   （仅主人/管理员，简单判断：e.isMaster）
  *  - #vv set speaker <名称或ID>  设置个人偏好说话人
  *  - #vv set pitch <value> 设置个人偏好音调
@@ -30,6 +32,10 @@ export class VoiceVoxTTS extends plugin {
         {
           reg: '^#vv(.*)$',
           fnc: 'tts'
+        },
+        {
+          reg: '^#cvv(.*)$',
+          fnc: 'chineseTts'
         }
       ]
     })
@@ -163,18 +169,130 @@ export class VoiceVoxTTS extends plugin {
         return e.reply('请先配置 VoiceVox ApiKey：#vv setkey <apiKey>')
       }
 
-      // 检测并转换中文为片假名
-      if (containsChinese(content)) {
-        await e.reply('检测到中文文本，正在转换为日语片假名...')
-        try {
-          // 从配置文件读取是否添加空格的设置
-          const addSpaces = cfg.chineseConvert?.addSpaces || false
-          content = await convertChineseToKatakana(content, addSpaces)
-          logger.info(`中文转换结果: ${content}`)
-        } catch (error) {
-          logger.error('中文转换失败:', error)
-          await e.reply('中文转换失败，将使用原文本进行合成')
+      // 直接使用原文本，不进行自动中文检测和转换
+
+      // 调用 API 合成
+      const baseUrl = (cfg.baseUrl || 'https://deprecatedapis.tts.quest/v2/voicevox/audio/').replace(/\/$/, '/')
+      const url = `${baseUrl}?key=${encodeURIComponent(cfg.apiKey)}&speaker=${encodeURIComponent(speaker)}&pitch=${encodeURIComponent(pitch)}&intonationScale=${encodeURIComponent(intonationScale)}&speed=${encodeURIComponent(speed)}&text=${encodeURIComponent(content)}`
+
+      await e.reply('正在合成语音，请稍等…')
+
+      const res = await fetch(url)
+
+      // 错误返回是 JSON 文本，成功为 audio/x-wav
+      const contentType = res.headers.get('content-type') || ''
+
+      if (!res.ok) {
+        const txt = await res.text()
+        
+        // 如果是 500 错误且内容包含中文，提供友好的引导
+        if (res.status === 500 && containsChinese(content)) {
+          return e.reply(`检测到可能输入了中文文本，VoiceVox 无法直接处理中文。\n请使用 #cvv 指令进行中文转片假名：\n#cvv ${content}`)
         }
+        
+        return e.reply(`合成失败(${res.status})：${txt}`)
+      }
+
+      if (!contentType.includes('audio')) {
+        // 错误文本：invalidApiKey / failed / notEnoughPoints / 其他
+        let bodyText = ''
+        try {
+          bodyText = await res.text()
+        } catch {}
+        const map = {
+          invalidApiKey: 'API Key 无效',
+          failed: '合成失败',
+          notEnoughPoints: '积分不足（notEnoughPoints）'
+        }
+        const tip = map[bodyText?.trim()] || (bodyText ? `接口返回：${bodyText}` : '接口未返回音频')
+        return e.reply(`合成失败：${tip}`)
+      }
+
+      // 直接拿文件直链上传（uploadRecord 支持 URL）
+      try {
+        const msg = await uploadRecord(res.url || url, 0, false)
+        await e.reply(msg)
+      } catch (err) {
+        // 回退为 segment.record(url)
+        try {
+          const msg2 = await segment.record(res.url || url)
+          await e.reply(msg2)
+        } catch (err2) {
+          // 如果直链方式失败，退化为下载再上传（临时文件）
+          const buf = Buffer.from(await res.arrayBuffer())
+          const tmp = `temp/voicevox_${Date.now()}.wav`
+          fs.mkdirSync('temp', { recursive: true })
+          fs.writeFileSync(tmp, buf)
+          try {
+            const msg3 = await uploadRecord(tmp, 0, false)
+            await e.reply(msg3)
+          } finally {
+            try { fs.unlinkSync(tmp) } catch {}
+          }
+        }
+      }
+    } catch (error) {
+      logger.error(error)
+      e.reply('语音合成发生异常')
+    }
+
+    return true
+  }
+
+  /**
+   * 处理中文转片假名 TTS 指令 (#cvv)
+   * 会自动将中文转换为片假名再进行语音合成
+   */
+  async chineseTts(e) {
+    try {
+      const cfg = YAML.parse(fs.readFileSync('./plugins/voicevox-plugin/config/config.yaml', 'utf8'))
+      
+      let raw = e.msg.trim()
+      if (!raw.startsWith('#cvv')) return false
+
+      // 获取用户偏好设置
+      const userId = e.user_id || e.sender?.user_id
+      const userPrefs = await this.getUserPrefs(userId)
+
+      // 解析 speaker 与文本
+      let content = raw.replace('#cvv', '').trim()
+      if (!content) return e.reply('用法：#cvv [speaker名称或ID] 中文文本')
+
+      // 使用用户偏好设置作为默认值
+      let speaker = userPrefs.speaker ?? cfg.speaker ?? 0
+      let pitch = userPrefs.pitch ?? cfg.pitch ?? 0
+      let intonationScale = userPrefs.intonationScale ?? cfg.intonationScale ?? 1
+      let speed = userPrefs.speed ?? cfg.speed ?? 1
+
+      // 如果首个 token 是数字或speaker名称，则认为是 speaker
+      const tokens = content.split(/\s+/)
+      if (tokens.length >= 2) {
+        const speakerId = findSpeaker(tokens[0])
+        if (speakerId !== null) {
+          speaker = speakerId
+          content = tokens.slice(1).join(' ')
+        }
+      }
+
+      if (!cfg.apiKey) {
+        return e.reply('请先配置 VoiceVox ApiKey：#vv setkey <apiKey>')
+      }
+
+      // 强制转换中文为片假名
+      await e.reply('正在转换中文为日语片假名...')
+      try {
+        // 从配置文件读取是否添加空格的设置
+        const addSpaces = cfg.chineseConvert?.addSpaces || false
+        const originalContent = content
+        content = await convertChineseToKatakana(content, addSpaces)
+        logger.info(`中文转换: "${originalContent}" -> "${content}"`)
+        
+        if (content === originalContent) {
+          await e.reply('警告：文本中可能不包含中文字符，将使用原文本进行合成')
+        }
+      } catch (error) {
+        logger.error('中文转换失败:', error)
+        await e.reply('中文转换失败，将使用原文本进行合成')
       }
 
       // 调用 API 合成
