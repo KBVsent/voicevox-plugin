@@ -92,6 +92,11 @@ export const helpList = [
       },
       {
         "icon": 12,
+        "title": "#vv setspace <值>",
+        "desc": "设置中文转换是否添加空格分隔"
+      },
+      {
+        "icon": 13,
         "title": "#vv 更新",
         "desc": "更新插件到最新版本"
       }

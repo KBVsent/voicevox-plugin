@@ -3,6 +3,7 @@ import plugin from '../../../lib/plugins/plugin.js'
 import YAML from 'yaml'
 import fs from 'fs'
 import { findSpeaker, getSpeakerName, getSpeakerList } from '../config/speakers.js'
+import { containsChinese, convertChineseToKatakana } from '../model/chineseConverter.js'
 
 /**
  * VoiceVox TTS 语音合成
@@ -96,6 +97,21 @@ export class VoiceVoxTTS extends plugin {
         return e.reply('VoiceVox ApiKey 已更新')
       }
 
+      // 子命令：设置中文转换空格
+      if (/^#vv\s+setspace\s+/i.test(raw)) {
+        if (!e.isMaster) return e.reply('无权限')
+        const spaceValue = raw.replace(/^#vv\s+setspace\s+/i, '').trim().toLowerCase()
+        if (!['true', 'false', 'on', 'off'].includes(spaceValue)) {
+          return e.reply('用法：#vv setspace <true|false|on|off>')
+        }
+        
+        const addSpaces = spaceValue === 'true' || spaceValue === 'on'
+        if (!cfg.chineseConvert) cfg.chineseConvert = {}
+        cfg.chineseConvert.addSpaces = addSpaces
+        
+        fs.writeFileSync('./plugins/voicevox-plugin/config/config.yaml', YAML.stringify(cfg))
+        return e.reply(`中文转换空格分隔已${addSpaces ? '开启' : '关闭'}`)
+      }
 
 
       // 子命令：设置个人偏好
@@ -145,6 +161,20 @@ export class VoiceVoxTTS extends plugin {
 
       if (!cfg.apiKey) {
         return e.reply('请先配置 VoiceVox ApiKey：#vv setkey <apiKey>')
+      }
+
+      // 检测并转换中文为片假名
+      if (containsChinese(content)) {
+        await e.reply('检测到中文文本，正在转换为日语片假名...')
+        try {
+          // 从配置文件读取是否添加空格的设置
+          const addSpaces = cfg.chineseConvert?.addSpaces || false
+          content = await convertChineseToKatakana(content, addSpaces)
+          logger.info(`中文转换结果: ${content}`)
+        } catch (error) {
+          logger.error('中文转换失败:', error)
+          await e.reply('中文转换失败，将使用原文本进行合成')
+        }
       }
 
       // 调用 API 合成
